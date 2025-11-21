@@ -6,6 +6,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 from datetime import datetime
 import pytz # 한국 시간 처리를 위해 필요
+import json # 추가
 
 # ---------------------------------------------------------
 # 1. 구글 시트 연결 및 인증 (Connection)
@@ -19,14 +20,26 @@ scope = [
 
 @st.cache_resource
 def get_connection():
+    # gspread와 ServiceAccountCredentials가 import 되어있다고 가정
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive'] 
+    
     try:
-        creds = ServiceAccountCredentials.from_json_keyfile_name("secrets.json", scope)
+        # 1. Streamlit Secrets에서 TOML 변수(JSON 문자열)를 가져옴
+        json_string = st.secrets["google_sheets_key"] 
+        
+        # 2. JSON 문자열을 파이썬 딕셔너리로 변환
+        json_key = json.loads(json_string) 
+        
+        # 3. 딕셔너리를 사용하여 인증 정보 생성
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(json_key, scope)
+        
+        # 4. Google Sheets 연결
         client = gspread.authorize(creds)
-        # 시트 파일 열기 (파일명 확인: Oracle_DB)
         doc = client.open("Oracle_DB")
         return doc
     except Exception as e:
-        st.error(f"❌ DB 연결 실패: {e}")
+        # 이 부분이 실행되면 DB 연결 실패: 터미널에 에러를 출력하고 None을 반환
+        print(f"DB CONNECTION FAILED: {e}") 
         return None
 
 # [중요] 연결 객체(doc)를 미리 만들어 둡니다.
