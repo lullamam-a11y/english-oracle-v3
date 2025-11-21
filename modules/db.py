@@ -44,11 +44,12 @@ def get_connection():
         
         return doc
         
+    
     except Exception as e:
-        # 이 에러가 발생하는 것은 인증 키가 유효하지 않거나, 파일 이름이 잘못된 경우 뿐입니다.
-        print(f"FINAL DB CONNECTION FAILED: {e}") 
+        # 에러 메시지를 화면에 빨갛게 출력하여 원인을 바로 확인!
+        st.error(f"🔥 상세 연결 에러: {e}")
         return None
-        
+  
     finally:
         # 4. 앱이 실행된 후 임시 파일 삭제 (cleanup)
         if os.path.exists(temp_file_path):
