@@ -5,3 +5,4 @@ oauth2client
 gTTS
 plotly
 pytz
+google-auth
