@@ -22,31 +22,32 @@ scope = [
 def get_connection():
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive'] 
     
-    # [핵심] JSON 파일 생성 없이 인증 정보를 딕셔너리로 직접 구성
+    # [핵심] 1. JSON 내용을 임시 파일로 저장하여 인증 (가장 확실한 인증 방식)
+    creds_json = st.secrets["GOOGLE_CREDENTIALS"]
+    temp_file_path = "creds.json"
+    
     try:
-        # Streamlit Secrets에서 개별 변수 읽기
-        creds_dict = {
-            "type": st.secrets["G_TYPE"],
-            "project_id": st.secrets["G_PROJECT_ID"],
-            "private_key_id": st.secrets["G_PRIVATE_KEY_ID"],
+        # 1. 파일 쓰기 (임시)
+        with open(temp_file_path, "w") as f:
+            f.write(creds_json)
             
-            # Private Key는 강제로 Newline(\n)을 포함해야 gspread가 인식합니다.
-            # \n 변환 로직이 핵심입니다.
-            "private_key": st.secrets["G_PRIVATE_KEY"].replace('\\n', '\n'), 
-            
-            "client_email": st.secrets["G_CLIENT_EMAIL"],
-        }
+        # 2. 임시 파일을 사용하여 인증
+        creds = ServiceAccountCredentials.from_json_keyfile_name(temp_file_path, scope)
         
-        # 딕셔너리를 사용하여 인증 정보 생성
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-        
-        # Google Sheets 연결
+        # 3. Google Sheets 연결
         client = gspread.authorize(creds)
         doc = client.open("Oracle_DB")
+        
         return doc
+        
     except Exception as e:
         print(f"FINAL DB CONNECTION FAILED: {e}") 
         return None
+        
+    finally:
+        # 4. 앱이 실행된 후 임시 파일 삭제 (선택적)
+        if os.path.exists(temp_file_path):
+             os.remove(temp_file_path)
 
 # [중요] 연결 객체(doc)를 미리 만들어 둡니다.
 doc = get_connection()
