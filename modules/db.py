@@ -23,14 +23,17 @@ scope = [
 def get_connection():
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive'] 
     
-    # [핵심] 1. JSON 내용을 임시 파일로 저장하여 인증 (가장 확실한 인증 방식)
+    # [핵심] 1. JSON 내용을 임시 파일로 저장하여 인증
     creds_json = st.secrets["GOOGLE_CREDENTIALS"]
     temp_file_path = "creds.json"
     
     try:
+        # CRITICAL FIX: .strip()으로 앞뒤의 모든 공백/빈 줄을 제거하여 JSON 무결성 확보
+        cleaned_json = creds_json.strip() 
+        
         # 1. 파일 쓰기 (임시)
         with open(temp_file_path, "w") as f:
-            f.write(creds_json)
+            f.write(cleaned_json) 
             
         # 2. 임시 파일을 사용하여 인증
         creds = ServiceAccountCredentials.from_json_keyfile_name(temp_file_path, scope)
@@ -42,11 +45,12 @@ def get_connection():
         return doc
         
     except Exception as e:
+        # 이 에러가 발생하는 것은 인증 키가 유효하지 않거나, 파일 이름이 잘못된 경우 뿐입니다.
         print(f"FINAL DB CONNECTION FAILED: {e}") 
         return None
         
     finally:
-        # 4. 앱이 실행된 후 임시 파일 삭제 (선택적)
+        # 4. 앱이 실행된 후 임시 파일 삭제 (cleanup)
         if os.path.exists(temp_file_path):
              os.remove(temp_file_path)
 
