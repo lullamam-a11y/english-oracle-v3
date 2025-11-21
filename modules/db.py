@@ -1,14 +1,46 @@
-# modules/db.py (google-auth 적용 및 디버깅 강화 버전)
+# modules/db.py (최종 통합본: 자동 보정 + 모든 기능 포함)
 
 import streamlit as st
 import gspread
-from google.oauth2.service_account import Credentials # [변경] 최신 표준 라이브러리
+from google.oauth2.service_account import Credentials
 import pandas as pd
 from datetime import datetime
 import pytz 
+import re # [추가] 정규표현식 사용을 위해 필요
 
 # ---------------------------------------------------------
-# 1. 구글 시트 연결 및 인증 (Connection)
+# 1. 키 자동 보정 함수 (Incorrect Padding 해결사)
+# ---------------------------------------------------------
+def fix_private_key(key):
+    """
+    사용자가 입력한 키가 꼬여있을 경우, 강제로 분해해서 표준 형태로 재조립합니다.
+    """
+    try:
+        # 1. 앞뒤 공백 제거
+        key = key.strip()
+        
+        # 2. 이미 \n 처리가 되어 있다면 변환
+        if "\\n" in key:
+            key = key.replace("\\n", "\n")
+            
+        # 3. 헤더/푸터 내용 발라내기
+        if "-----BEGIN PRIVATE KEY-----" in key:
+            clean_body = key.replace("-----BEGIN PRIVATE KEY-----", "") \
+                            .replace("-----END PRIVATE KEY-----", "")
+        else:
+            clean_body = key 
+            
+        # 4. 본문에 섞인 공백/줄바꿈 싹 제거 (순수 키값만 추출)
+        clean_body = re.sub(r"\s+", "", clean_body)
+        
+        # 5. 표준 포맷으로 재조립
+        fixed_key = f"-----BEGIN PRIVATE KEY-----\n{clean_body}\n-----END PRIVATE KEY-----"
+        return fixed_key
+    except Exception:
+        return key
+
+# ---------------------------------------------------------
+# 2. 구글 시트 연결 및 인증 (Connection)
 # ---------------------------------------------------------
 
 # 권한 범위 (Scope)
@@ -25,13 +57,13 @@ def get_connection():
             st.error("🚨 Secrets 설정 오류: '[gcp_service_account]' 헤더를 찾을 수 없습니다.")
             return None
 
+        # st.secrets는 수정 불가능 객체이므로 dict로 변환
         creds_dict = dict(st.secrets["gcp_service_account"])
         
-        # [2] Private Key 줄바꿈 문자 강제 변환 (가장 중요한 부분)
-        # TOML에서 가져올 때 \\n으로 들어오는 것을 실제 엔터(\n)로 바꿔줍니다.
+        # [2] Private Key 강제 수리 (핵심 로직 적용)
         if "private_key" in creds_dict:
             raw_key = creds_dict["private_key"]
-            creds_dict["private_key"] = raw_key.replace("\\n", "\n")
+            creds_dict["private_key"] = fix_private_key(raw_key)
         
         # [3] google-auth 라이브러리로 인증 (신형)
         creds = Credentials.from_service_account_info(
@@ -50,15 +82,14 @@ def get_connection():
         st.error("🚨 DB 연결 실패: 'Oracle_DB'라는 이름의 구글 시트를 찾을 수 없습니다. (봇 이메일 초대 필수)")
         return None
     except Exception as e:
-        # [디버깅] 화면에 에러 원인을 직접 출력
-        st.error(f"🔥 상세 에러 메시지: {str(e)}")
+        st.error(f"🔥 DB 연결 에러 (상세): {str(e)}")
         return None
 
 # 연결 객체 생성
 doc = get_connection()
 
 # ---------------------------------------------------------
-# 2. 워크시트 정의 (안전 장치 포함)
+# 3. 워크시트 정의 (안전 장치 포함)
 # ---------------------------------------------------------
 if doc:
     try:
@@ -69,7 +100,6 @@ if doc:
         weekly_history_sheet = doc.worksheet("Weekly_History")
     except gspread.WorksheetNotFound as e:
         st.warning(f"⚠️ 일부 시트를 찾을 수 없습니다: {e}")
-        # 에러가 나도 멈추지 않도록 처리
         user_sheet = None
 else:
     user_sheet = None
@@ -79,7 +109,7 @@ else:
     weekly_history_sheet = None
 
 # ---------------------------------------------------------
-# 3. 데이터 조회/조작 함수들
+# 4. 데이터 조회/조작 함수들 (모든 기능 포함됨)
 # ---------------------------------------------------------
 
 def get_data(sheet_name):
