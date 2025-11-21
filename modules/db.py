@@ -22,21 +22,25 @@ scope = [
 def get_connection():
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive'] 
     try:
-        # 1. Streamlit Secrets에서 TOML 변수(JSON 문자열)를 가져옴
-        json_string = st.secrets["google_sheets_key"] 
+        # Streamlit Secrets의 개별 TOML 변수를 읽어 딕셔너리로 재조립
+        creds_dict = {
+            "type": st.secrets["G_TYPE"],
+            "project_id": st.secrets["G_PROJECT_ID"],
+            "private_key_id": st.secrets["G_PRIVATE_KEY_ID"],
+            # Private Key는 Newline(\n)을 포함하므로 raw string 처리 후,
+            # gspread가 요구하는 \n으로 다시 변환하는 작업이 필요할 수 있음.
+            "private_key": st.secrets["G_PRIVATE_KEY"].replace('"', '').replace('\\n', '\n'), # 핵심 수정
+            "client_email": st.secrets["G_CLIENT_EMAIL"],
+        }
         
-        # 2. JSON 문자열을 파이썬 딕셔너리로 변환
-        json_key = json.loads(json_string) 
+        # 딕셔너리를 사용하여 인증 정보 생성
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         
-        # 3. 딕셔너리를 사용하여 인증 정보 생성
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(json_key, scope)
-        
-        # 4. Google Sheets 연결
+        # Google Sheets 연결
         client = gspread.authorize(creds)
         doc = client.open("Oracle_DB")
         return doc
     except Exception as e:
-        # DB 연결 실패 시 에러 대신 None을 반환
         print(f"FINAL DB CONNECTION FAILED: {e}") 
         return None
 
