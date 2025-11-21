@@ -1,58 +1,42 @@
-# modules/auth.py (자동 로그인 + 권한 관리 통합 버전)
+# modules/auth.py (안전장치 추가 버전)
 import streamlit as st
 import pandas as pd
 from modules import db
 
 def login():
-    # ------------------------------------------------------------------
-    # [Step 1] URL이나 세션을 확인해서 자동 로그인 시도
-    # ------------------------------------------------------------------
-    
-    # 1. 세션 변수 초기화 (로그인 상태 & 권한)
+    # 1. 세션 초기화
     if "logged_in" not in st.session_state:
         st.session_state["logged_in"] = False
-        st.session_state["role"] = "student" # 기본값은 학생
+        st.session_state["role"] = "student"
 
-    # 2. URL에 'student_id' 꼬리표가 있는지 확인 (새로고침 대응)
     query_params = st.query_params
     url_id = query_params.get("student_id", None)
 
-    # 3. 세션에는 없는데 URL에는 ID가 있다면? -> DB 확인 후 자동 로그인 처리
+    # 2. 자동 로그인 시도
     if not st.session_state["logged_in"] and url_id:
         try:
             users_data = db.get_data("Users")
-            df = pd.DataFrame(users_data)
-            
-            # URL에 있는 ID가 실제 DB에 존재하는지 검증
-            user = df[df["Student_ID"].astype(str) == str(url_id)]
-            
-            if not user.empty:
-                # 검증 통과! 세션에 정보 입력
-                st.session_state["logged_in"] = True
-                st.session_state["user_name"] = user.iloc[0]["Name"]
-                st.session_state["user_id"] = user.iloc[0]["Student_ID"]
+            # [방어 로직] 데이터가 비어있으면 중단
+            if users_data:
+                df = pd.DataFrame(users_data)
+                # 컬럼 이름 공백 제거
+                df.columns = df.columns.str.strip()
                 
-                # [New] 권한(Role) 정보 읽어오기
-                # 혹시 Role 컬럼을 안 만들었을 경우를 대비해 안전장치 추가
-                if "Role" in user.columns:
-                    st.session_state["role"] = user.iloc[0]["Role"]
-                else:
-                    st.session_state["role"] = "student"
-                    
+                if "Student_ID" in df.columns:
+                    user = df[df["Student_ID"].astype(str) == str(url_id)]
+                    if not user.empty:
+                        st.session_state["logged_in"] = True
+                        st.session_state["user_name"] = user.iloc[0]["Name"]
+                        st.session_state["user_id"] = user.iloc[0]["Student_ID"]
+                        st.session_state["role"] = user.iloc[0].get("Role", "student")
         except Exception:
-            pass # DB 연결 에러 시 그냥 로그인 화면으로
+            pass 
 
-    # ------------------------------------------------------------------
-    # [Step 2] 로그인 여부 최종 판단
-    # ------------------------------------------------------------------
-    
-    # 이미 로그인 된 상태라면 (세션 O) -> 문 열어줌
+    # 3. 로그인 상태면 통과
     if st.session_state["logged_in"]:
         return True
 
-    # ------------------------------------------------------------------
-    # [Step 3] 로그인 화면 출력 (아직 로그인 안 된 경우)
-    # ------------------------------------------------------------------
+    # 4. 로그인 화면
     st.title("🔐 THE ORACLE: Access Gate")
     
     with st.form("login_form"):
@@ -62,24 +46,29 @@ def login():
 
         if submit_btn:
             users_data = db.get_data("Users")
-            df = pd.DataFrame(users_data)
             
+            # [방어 로직] DB 연결 실패 등으로 데이터가 없으면 에러 메시지
+            if not users_data:
+                st.error("데이터베이스에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.")
+                return False
+
+            df = pd.DataFrame(users_data)
+            df.columns = df.columns.str.strip() # 컬럼명 공백 제거
+
+            # 필수 컬럼 확인
+            if "Student_ID" not in df.columns or "Password" not in df.columns:
+                st.error("DB 구조 오류: Student_ID 컬럼을 찾을 수 없습니다.")
+                return False
+
             # ID/PW 대조
             user = df[(df["Student_ID"].astype(str) == user_id) & (df["Password"].astype(str) == password)]
 
             if not user.empty:
-                # 로그인 성공!
                 st.session_state["logged_in"] = True
                 st.session_state["user_name"] = user.iloc[0]["Name"]
                 st.session_state["user_id"] = user.iloc[0]["Student_ID"]
+                st.session_state["role"] = user.iloc[0].get("Role", "student")
                 
-                # [New] 권한(Role) 정보 저장
-                if "Role" in user.columns:
-                    st.session_state["role"] = user.iloc[0]["Role"]
-                else:
-                    st.session_state["role"] = "student"
-                
-                # [핵심] URL에 꼬리표 달기 (이제 새로고침해도 기억함!)
                 st.query_params["student_id"] = user.iloc[0]["Student_ID"]
                 
                 st.success("로그인 성공! 접속 중...")
@@ -90,8 +79,7 @@ def login():
     return False
 
 def logout():
-    """로그아웃 버튼용 함수"""
     st.session_state["logged_in"] = False
-    st.session_state["role"] = None # 권한도 초기화
-    st.query_params.clear() # URL 꼬리표 제거
+    st.session_state["role"] = None
+    st.query_params.clear()
     st.rerun()
