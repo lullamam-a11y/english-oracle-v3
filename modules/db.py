@@ -7,6 +7,7 @@ import pandas as pd
 from datetime import datetime
 import pytz # 한국 시간 처리를 위해 필요
 import json # 추가
+import os  #
 
 # ---------------------------------------------------------
 # 1. 구글 시트 연결 및 인증 (Connection)
