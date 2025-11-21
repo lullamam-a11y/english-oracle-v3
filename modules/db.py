@@ -22,14 +22,15 @@ scope = [
 def get_connection():
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive'] 
     try:
-        # Streamlit Secrets의 개별 TOML 변수를 읽어 딕셔너리로 재조립
+        # Streamlit Secrets에서 개별 TOML 변수를 읽어 딕셔너리로 재조립
         creds_dict = {
             "type": st.secrets["G_TYPE"],
             "project_id": st.secrets["G_PROJECT_ID"],
             "private_key_id": st.secrets["G_PRIVATE_KEY_ID"],
-            # Private Key는 Newline(\n)을 포함하므로 raw string 처리 후,
-            # gspread가 요구하는 \n으로 다시 변환하는 작업이 필요할 수 있음.
-            "private_key": st.secrets["G_PRIVATE_KEY"].replace('"', '').replace('\\n', '\n'), # 핵심 수정
+            
+            # [최종 수정] Private Key의 문자열 내부에 있는 '\n'을 실제 개행 문자로 변환
+            "private_key": st.secrets["G_PRIVATE_KEY"].replace('\\n', '\n'), 
+            
             "client_email": st.secrets["G_CLIENT_EMAIL"],
         }
         
