@@ -21,14 +21,17 @@ scope = [
 @st.cache_resource
 def get_connection():
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive'] 
+    
+    # [핵심] JSON 파일 생성 없이 인증 정보를 딕셔너리로 직접 구성
     try:
-        # Streamlit Secrets에서 개별 TOML 변수를 읽어 딕셔너리로 재조립
+        # Streamlit Secrets에서 개별 변수 읽기
         creds_dict = {
             "type": st.secrets["G_TYPE"],
             "project_id": st.secrets["G_PROJECT_ID"],
             "private_key_id": st.secrets["G_PRIVATE_KEY_ID"],
             
-            # [최종 수정] Private Key의 문자열 내부에 있는 '\n'을 실제 개행 문자로 변환
+            # Private Key는 강제로 Newline(\n)을 포함해야 gspread가 인식합니다.
+            # \n 변환 로직이 핵심입니다.
             "private_key": st.secrets["G_PRIVATE_KEY"].replace('\\n', '\n'), 
             
             "client_email": st.secrets["G_CLIENT_EMAIL"],
