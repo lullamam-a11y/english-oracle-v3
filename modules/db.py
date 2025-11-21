@@ -20,9 +20,7 @@ scope = [
 
 @st.cache_resource
 def get_connection():
-    # gspread와 ServiceAccountCredentials가 import 되어있다고 가정
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive'] 
-    
     try:
         # 1. Streamlit Secrets에서 TOML 변수(JSON 문자열)를 가져옴
         json_string = st.secrets["google_sheets_key"] 
@@ -38,8 +36,8 @@ def get_connection():
         doc = client.open("Oracle_DB")
         return doc
     except Exception as e:
-        # 이 부분이 실행되면 DB 연결 실패: 터미널에 에러를 출력하고 None을 반환
-        print(f"DB CONNECTION FAILED: {e}") 
+        # DB 연결 실패 시 에러 대신 None을 반환
+        print(f"FINAL DB CONNECTION FAILED: {e}") 
         return None
 
 # [중요] 연결 객체(doc)를 미리 만들어 둡니다.
