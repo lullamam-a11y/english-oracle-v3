@@ -69,6 +69,10 @@ if doc:
         homework_list_sheet = doc.worksheet("Homework_List")
         homework_log_sheet = doc.worksheet("Homework_Log")
         exam_results_sheet = doc.worksheet("Exam_Results")
+        weekly_history_sheet = doc.worksheet("Weekly_History")
+    except gspread.WorksheetNotFound as e:
+        st.error(f"⚠️ 시트를 찾을 수 없습니다: {e}")
+        st.stop()
         
         # [신규] 주간 기록 및 단어 관련 시트 (없으면 에러가 날 수 있으니 시트 생성 필수)
         # 만약 아직 시트를 안 만들었다면 이 부분에서 에러가 날 수 있습니다.
@@ -97,11 +101,7 @@ def get_data(sheet_name):
 
 # [신규] 모든 학생 목록 가져오기 (Admin용)
 def get_all_users():
-    """
-    Users 시트에서 role이 'student'인 학생들의 ID와 이름을 가져옵니다.
-    """
     try:
-        # 최신 데이터를 읽기 위해 캐시 없이 직접 호출
         users = user_sheet.get_all_records()
         user_list = [
             f"{u['Student_ID']} ({u['Name']})" 
