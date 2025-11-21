@@ -1,26 +1,38 @@
-# auth.py 파일의 맨 위 첫 줄
 import streamlit as st
+# 여기에 필요한 DB 연결 라이브러리가 있다면 import 해야 합니다 (예: cx_Oracle, pandas 등)
+# 기존에 run_query 함수가 어디 있는지 모르겠지만, auth.py 내부에 있다고 가정하고 작성합니다.
 
-    # ▼▼▼ [여기서부터 복사하세요] ▼▼▼
-    # (주의: 이 코드는 def 함수명(): 아래에 위치해야 하므로 앞에 공백이 있어야 합니다)
-
-    # 1. 쿼리 실행 (run_query 함수가 auth.py 안에 정의되어 있어야 함)
-    query = "SELECT * FROM students WHERE id = :id" 
-    result = run_query(query, id=username)
+def check_password(username):
+    """
+    사용자가 입력한 ID(username)를 받아 DB에서 확인하는 함수
+    """
+    # 1. 쿼리 작성 (바인딩 변수 :id 사용)
+    query = "SELECT * FROM students WHERE id = :id"
+    
+    # 2. 쿼리 실행 (run_query는 사용자가 정의한 DB 실행 함수라고 가정)
+    # 만약 run_query가 이 파일에 없다면, 에러가 날 수 있습니다.
+    # 그럴 경우 기존에 쓰시던 DB 실행 코드로 바꿔야 합니다.
+    try:
+        # run_query 함수가 있다고 가정
+        result = run_query(query, id=username) 
+    except NameError:
+        st.error("시스템 오류: 'run_query' 함수를 찾을 수 없습니다. DB 연결 코드를 확인해주세요.")
+        return False
 
     # --- [디버깅 코드 시작] ---
-    st.error("--- 🔍 오라클 디버깅 모드 ---")
-    # 공백 확인을 위해 작은따옴표('')로 감싸서 출력
-    st.write(f"1. 사용자가 입력한 ID: '{username}' (길이: {len(username)})") 
-    st.write(f"2. 실행된 쿼리 결과(Raw Data): {result}") 
+    st.warning("--- 🔍 오라클 디버깅 모드 ---")
+    st.write(f"1. 입력한 ID: '{username}' (길이: {len(username)})")
+    st.write(f"2. DB 조회 결과: {result}")
 
-    # 결과가 비어있는지 확인
     if not result:
-        st.write("👉 결과가 비어있습니다. (DB 매칭 실패 - 공백이나 대소문자 확인 필요)")
+        st.error("👉 결과가 비어있습니다. (DB 매칭 실패)")
+        st.info("팁: DB 데이터 뒤에 공백이 있거나, 대소문자가 다를 수 있습니다.")
     else:
-        st.write("👉 데이터를 성공적으로 가져왔습니다.")
+        st.success("👉 데이터를 찾았습니다!")
     # --- [디버깅 코드 끝] ---
 
+    # 결과 반환
     if result:
-        return result # 혹은 return True
-    # ▲▲▲ [여기까지] ▲▲▲
+        return True # 또는 result 자체를 반환
+    else:
+        return False
