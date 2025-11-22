@@ -1,5 +1,4 @@
-# modules/db.py (최종: 자동 보정 + 모든 CRUD 기능 + 데이터 대청소 포함)
-
+# modules/db.py
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
@@ -9,7 +8,7 @@ import pytz
 import re 
 
 # ---------------------------------------------------------
-# 1. 키 자동 보정 함수 (Incorrect Padding 해결사)
+# 1. 키 자동 보정 함수 (기능 유지)
 # ---------------------------------------------------------
 def fix_private_key(key):
     try:
@@ -28,7 +27,7 @@ def fix_private_key(key):
         return key
 
 # ---------------------------------------------------------
-# 2. 구글 시트 연결 및 인증
+# 2. 구글 시트 연결 및 인증 (리소스 캐싱 유지)
 # ---------------------------------------------------------
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -57,7 +56,7 @@ def get_connection():
 doc = get_connection()
 
 # ---------------------------------------------------------
-# 3. 워크시트 정의
+# 3. 워크시트 정의 (기능 유지)
 # ---------------------------------------------------------
 if doc:
     try:
@@ -66,7 +65,6 @@ if doc:
         homework_log_sheet = doc.worksheet("Homework_Log")
         exam_results_sheet = doc.worksheet("Exam_Results")
         weekly_history_sheet = doc.worksheet("Weekly_History")
-        # [누락 방지] 아카이브 시트도 정의 (없으면 생성 시도 로직은 생략, 수동 생성 권장)
         try:
             log_archive_sheet = doc.worksheet("Log_Archive")
         except:
@@ -82,9 +80,11 @@ else:
     log_archive_sheet = None
 
 # ---------------------------------------------------------
-# 4. 데이터 조회/조작 함수들
+# 4. 데이터 조회/조작 함수들 (★수정됨: 캐싱 적용★)
 # ---------------------------------------------------------
 
+# [핵심 수정] ttl=600(10분) 캐싱 적용 -> 403 에러 방지 및 속도 향상
+@st.cache_data(ttl=600)
 def get_data(sheet_name):
     if doc is None: return []
     try:
@@ -112,11 +112,13 @@ def get_weekly_history(student_id):
         return [r for r in rows if str(r.get("Student_ID")) == str(student_id)]
     except: return []
 
+# [데이터 쓰기 함수들: 실행 후 캐시 초기화(st.cache_data.clear) 추가]
+
 def add_homework_assignment(student_id, category, task_name, custom_text, weekly_goal):
     if homework_list_sheet is None: return False
     try:
         homework_list_sheet.append_row([student_id, category, task_name, custom_text, weekly_goal])
-        st.cache_data.clear()
+        st.cache_data.clear() # 데이터 변경 시 캐시 삭제
         return True
     except: return False
 
@@ -125,7 +127,7 @@ def add_homework_log(student_id, task_name, day_of_week):
     try:
         now = datetime.now(pytz.timezone('Asia/Seoul')).strftime("%Y-%m-%d %H:%M:%S")
         homework_log_sheet.append_row([student_id, task_name, now, day_of_week])
-        st.cache_data.clear() 
+        st.cache_data.clear() # 데이터 변경 시 캐시 삭제
     except: pass
 
 def delete_homework_log(student_id, task_name, day_of_week):
@@ -136,7 +138,7 @@ def delete_homework_log(student_id, task_name, day_of_week):
             row = logs[i]
             if str(row[0]) == str(student_id) and str(row[1]) == str(task_name) and str(row[3]) == str(day_of_week):
                 homework_log_sheet.delete_rows(i + 1) 
-                st.cache_data.clear()
+                st.cache_data.clear() # 데이터 변경 시 캐시 삭제
                 return True
         return False
     except: return False
@@ -150,42 +152,24 @@ def reset_student_homework(student_id):
         homework_list_sheet.clear()
         homework_list_sheet.append_row(header)
         if new_rows: homework_list_sheet.append_rows(new_rows)
-        st.cache_data.clear()
+        st.cache_data.clear() # 데이터 변경 시 캐시 삭제
         return True
     except: return False
-# modules/db.py (맨 아래에 이어서 붙여넣으세요)
 
-# ---------------------------------------------------------
-# [누락 복구] 주간 히스토리 일괄 저장 함수
-# ---------------------------------------------------------
 def add_weekly_history(rows_data):
-    """
-    homework.py에서 계산한 '누락된 주간 통계'를 
-    Weekly_History 시트에 한꺼번에 저장하는 함수
-    """
     if weekly_history_sheet is None: return False
-    
     try:
-        # rows_data는 [[ID, 날짜, 카테고리, 목표, 완료], ...] 형태의 리스트
         weekly_history_sheet.append_rows(rows_data)
-        st.cache_data.clear()
+        st.cache_data.clear() # 데이터 변경 시 캐시 삭제
         return True
     except Exception as e:
         print(f"히스토리 저장 실패: {e}")
         return False
 
-
-# ---------------------------------------------------------
-# [복구된 기능] 데이터 대청소 함수 (archive_old_logs)
-# ---------------------------------------------------------
 def archive_old_logs(days=30):
-    """
-    30일 지난 로그를 Log_Archive 시트로 이동
-    """
     if doc is None: return "DB 연결 실패"
     
     try:
-        # 시트 재확인
         try:
             log_sheet = doc.worksheet("Homework_Log")
             archive_sheet = doc.worksheet("Log_Archive")
@@ -206,7 +190,6 @@ def archive_old_logs(days=30):
         
         for row in data_rows:
             try:
-                # 날짜 컬럼(C열, index 2) 확인
                 if len(row) > 2:
                     log_date_str = row[2] 
                     log_date = datetime.strptime(log_date_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=kst)
@@ -216,9 +199,9 @@ def archive_old_logs(days=30):
                     else:
                         rows_to_keep.append(row)
                 else:
-                    rows_to_keep.append(row) # 데이터 불완전 시 보존
+                    rows_to_keep.append(row)
             except:
-                rows_to_keep.append(row) # 날짜 파싱 실패 시 보존
+                rows_to_keep.append(row)
         
         if rows_to_archive:
             archive_sheet.append_rows(rows_to_archive)
@@ -227,7 +210,7 @@ def archive_old_logs(days=30):
             if rows_to_keep:
                 log_sheet.append_rows(rows_to_keep)
             
-            st.cache_data.clear() # 캐시 초기화
+            st.cache_data.clear() # 데이터 변경 시 캐시 삭제
             return f"✅ {len(rows_to_archive)}개의 기록을 정리했습니다."
         else:
             return "🧹 정리할 데이터가 없습니다."
