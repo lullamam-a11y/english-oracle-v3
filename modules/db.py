@@ -153,6 +153,27 @@ def reset_student_homework(student_id):
         st.cache_data.clear()
         return True
     except: return False
+# modules/db.py (맨 아래에 이어서 붙여넣으세요)
+
+# ---------------------------------------------------------
+# [누락 복구] 주간 히스토리 일괄 저장 함수
+# ---------------------------------------------------------
+def add_weekly_history(rows_data):
+    """
+    homework.py에서 계산한 '누락된 주간 통계'를 
+    Weekly_History 시트에 한꺼번에 저장하는 함수
+    """
+    if weekly_history_sheet is None: return False
+    
+    try:
+        # rows_data는 [[ID, 날짜, 카테고리, 목표, 완료], ...] 형태의 리스트
+        weekly_history_sheet.append_rows(rows_data)
+        st.cache_data.clear()
+        return True
+    except Exception as e:
+        print(f"히스토리 저장 실패: {e}")
+        return False
+
 
 # ---------------------------------------------------------
 # [복구된 기능] 데이터 대청소 함수 (archive_old_logs)
